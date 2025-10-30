@@ -1,5 +1,5 @@
 // URL de tu Google Apps Script
-const WEB_APP_URL = 'https://script.google.com/macros/library/d/14390Mb_ctVdv90QGwwfAclNkaAJGpL_nKCFgLd0HMDQKMutzWuPDyejO/5';
+const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbx9gqbG3hsE0Ohnz_zEb71ecnNqwkVE483IQZN7ii2Lt3soCIGDdDLsv27pprCAqyAV/exec';
 
 // Función para obtener datos del catálogo
 async function obtenerDatosCatalogo() {
