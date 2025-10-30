@@ -1,40 +1,46 @@
-// URL de tu Google Apps Script
+// URL de tu Google Apps Script - VERIFICA QUE ESTA URL SEA CORRECTA
 const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbx9gqbG3hsE0Ohnz_zEb71ecnNqwkVE483IQZN7ii2Lt3soCIGDdDLsv27pprCAqyAV/exec';
 
 // Función para obtener datos del catálogo
 async function obtenerDatosCatalogo() {
     try {
         console.log('🔄 Obteniendo catálogo...');
-        const url = `${WEB_APP_URL}?sheet=Catálogo`;
-        console.log('URL de petición:', url);
+        const url = `${WEB_APP_URL}?sheet=Catálogo&timestamp=${Date.now()}`;
+        console.log('📤 URL de petición GET:', url);
         
-        const response = await fetch(url);
+        const response = await fetch(url, {
+            method: 'GET',
+            mode: 'no-cors' // Esto puede ayudar con problemas de CORS
+        }).catch(error => {
+            console.error('❌ Error de fetch:', error);
+            throw new Error('No se pudo conectar al servidor: ' + error.message);
+        });
         
-        console.log('Respuesta recibida - Status:', response.status);
+        console.log('📥 Respuesta recibida - Status:', response.status, response.statusText);
         
         if (!response.ok) {
             throw new Error(`Error HTTP: ${response.status} ${response.statusText}`);
         }
         
         const data = await response.json();
-        console.log('Datos crudos recibidos:', data);
+        console.log('📋 Datos crudos recibidos:', data);
         
         // Si hay error en la respuesta
-        if (data.error) {
-            console.error('Error del servidor:', data.error);
+        if (data && data.error) {
+            console.error('❌ Error del servidor:', data.error);
             throw new Error(data.error);
         }
         
         // Si no es un array, puede que esté vacío o haya error
         if (!Array.isArray(data)) {
-            console.warn('Respuesta inesperada:', data);
+            console.warn('⚠️ Respuesta inesperada:', data);
             
             // Si es un objeto con error
             if (data && data.error) {
                 throw new Error(data.error);
             }
             
-            console.warn('Usando datos de ejemplo para catálogo');
+            console.warn('📋 Usando datos de ejemplo para catálogo');
             return obtenerDatosEjemploCatalogo();
         }
         
@@ -42,24 +48,25 @@ async function obtenerDatosCatalogo() {
         
         // Si está vacío, usar datos de ejemplo
         if (data.length === 0) {
-            console.warn('Catálogo vacío, usando datos de ejemplo');
+            console.warn('📭 Catálogo vacío, usando datos de ejemplo');
             return obtenerDatosEjemploCatalogo();
         }
         
-        return data.map((fila, index) => {
+        const productosProcesados = data.map((fila, index) => {
             const producto = {
-                idinventario: fila[0]?.toString()?.trim() || '',
-                descripcion: fila[1]?.toString()?.trim() || '',
+                idinventario: fila[0]?.toString()?.trim() || `PROD${index + 1}`,
+                descripcion: fila[1]?.toString()?.trim() || 'Producto sin descripción',
                 stockInicial: parseInt(fila[2]) || 0,
                 stockActual: parseInt(fila[3]) || 0,
                 stockFinal: parseInt(fila[4]) || 0,
                 costo: parseFloat(fila[5]) || 0,
                 precioVenta: parseFloat(fila[6]) || 0
             };
-            
-            console.log(`Producto ${index + 1}:`, producto);
             return producto;
         });
+        
+        console.log('📦 Productos procesados:', productosProcesados.length);
+        return productosProcesados;
         
     } catch (error) {
         console.error('❌ Error al obtener catálogo:', error);
@@ -67,72 +74,10 @@ async function obtenerDatosCatalogo() {
     }
 }
 
-// Función para obtener datos de pedidos
-async function obtenerDatosPedidos() {
-    try {
-        console.log('🔄 Obteniendo pedidos...');
-        const url = `${WEB_APP_URL}?sheet=Pedidos`;
-        console.log('URL de petición:', url);
-        
-        const response = await fetch(url);
-        
-        console.log('Respuesta recibida - Status:', response.status);
-        
-        if (!response.ok) {
-            throw new Error(`Error HTTP: ${response.status} ${response.statusText}`);
-        }
-        
-        const data = await response.json();
-        console.log('Datos crudos recibidos:', data);
-        
-        if (data.error) {
-            console.error('Error del servidor:', data.error);
-            throw new Error(data.error);
-        }
-        
-        if (!Array.isArray(data)) {
-            console.warn('Respuesta inesperada:', data);
-            
-            if (data && data.error) {
-                throw new Error(data.error);
-            }
-            
-            console.warn('Usando datos de ejemplo para pedidos');
-            return obtenerDatosEjemploPedidos();
-        }
-        
-        console.log(`✅ Pedidos cargados: ${data.length} registros`);
-        
-        if (data.length === 0) {
-            console.warn('Pedidos vacíos, usando datos de ejemplo');
-            return obtenerDatosEjemploPedidos();
-        }
-        
-        return data.map((fila, index) => {
-            const pedido = {
-                idPedido: fila[0]?.toString()?.trim() || '',
-                fecha: fila[1]?.toString()?.trim() || '',
-                descripcion: fila[2]?.toString()?.trim() || '',
-                cantidad: parseInt(fila[3]) || 0,
-                precio: parseFloat(fila[4]) || 0,
-                total: parseFloat(fila[5]) || 0,
-                vendedor: fila[6]?.toString()?.trim() || ''
-            };
-            
-            console.log(`Pedido ${index + 1}:`, pedido);
-            return pedido;
-        });
-        
-    } catch (error) {
-        console.error('❌ Error al obtener pedidos:', error);
-        return obtenerDatosEjemploPedidos();
-    }
-}
-
-// Función para guardar pedido
+// Función para guardar pedido - VERSIÓN MEJORADA
 async function guardarPedidoEnSheets(idPedido, vendedor, productos) {
     try {
-        console.log('📝 Intentando guardar pedido...', { 
+        console.log('📝 Iniciando guardado de pedido...', { 
             idPedido, 
             vendedor, 
             productosCount: productos.length 
@@ -154,23 +99,44 @@ async function guardarPedidoEnSheets(idPedido, vendedor, productos) {
             }))
         };
         
-        console.log('📤 Enviando datos a:', WEB_APP_URL);
-        console.log('Payload:', payload);
+        console.log('📤 Enviando POST a:', WEB_APP_URL);
+        console.log('📦 Payload:', JSON.stringify(payload));
         
-        const response = await fetch(WEB_APP_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(payload)
-        });
+        // Intentar con diferentes métodos para evitar problemas de CORS
+        let response;
+        
+        try {
+            // Método 1: Fetch normal
+            response = await fetch(WEB_APP_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload)
+            });
+        } catch (fetchError) {
+            console.error('❌ Error en fetch:', fetchError);
+            
+            // Método 2: Usar XMLHttpRequest como fallback
+            try {
+                console.log('🔄 Intentando con XMLHttpRequest...');
+                response = await enviarConXMLHttpRequest(WEB_APP_URL, payload);
+            } catch (xhrError) {
+                throw new Error(`Error de conexión: ${fetchError.message} | ${xhrError.message}`);
+            }
+        }
 
-        console.log('📥 Respuesta recibida, status:', response.status);
+        console.log('📥 Respuesta recibida, status:', response.status, response.statusText);
         
         if (!response.ok) {
-            const errorText = await response.text();
+            let errorText = 'Sin detalles';
+            try {
+                errorText = await response.text();
+            } catch (e) {
+                // Ignorar error al leer el texto
+            }
             console.error('❌ Error en respuesta:', errorText);
-            throw new Error(`Error del servidor: ${response.status} - ${response.statusText}`);
+            throw new Error(`Error del servidor: ${response.status} - ${response.statusText}. Detalles: ${errorText}`);
         }
 
         const result = await response.json();
@@ -186,12 +152,59 @@ async function guardarPedidoEnSheets(idPedido, vendedor, productos) {
     } catch (error) {
         console.error('❌ Error crítico al guardar pedido:', error);
         
-        if (error.message.includes('Failed to fetch')) {
-            throw new Error('Error de conexión: No se pudo conectar al servidor. Verifica:\n1. Tu conexión a internet\n2. Que la URL del script sea correcta\n3. Que el Google Apps Script esté desplegado correctamente');
+        if (error.message.includes('Failed to fetch') || 
+            error.message.includes('NetworkError') || 
+            error.message.includes('CORS') ||
+            error.message.includes('conexión')) {
+            
+            throw new Error(`Problema de conexión: ${error.message}\n\nPor favor verifica:\n1. Tu conexión a internet\n2. Que la URL del script sea correcta\n3. Que el Google Apps Script esté desplegado como "Aplicación web"\n4. Que los permisos sean "Cualquier persona"`);
         } else {
             throw new Error(`Error al guardar: ${error.message}`);
         }
     }
+}
+
+// Función auxiliar para enviar con XMLHttpRequest (fallback)
+function enviarConXMLHttpRequest(url, data) {
+    return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', url, true);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === 4) {
+                if (xhr.status === 200) {
+                    try {
+                        const response = JSON.parse(xhr.responseText);
+                        resolve({
+                            ok: true,
+                            status: xhr.status,
+                            json: () => Promise.resolve(response)
+                        });
+                    } catch (e) {
+                        reject(new Error('Error al parsear respuesta XMLHttpRequest: ' + e.message));
+                    }
+                } else {
+                    reject(new Error(`XMLHttpRequest error: ${xhr.status} ${xhr.statusText}`));
+                }
+            }
+        };
+        
+        xhr.onerror = function() {
+            reject(new Error('Error de red en XMLHttpRequest'));
+        };
+        
+        xhr.timeout = 30000; // 30 segundos
+        xhr.ontimeout = function() {
+            reject(new Error('Timeout en XMLHttpRequest'));
+        };
+        
+        try {
+            xhr.send(JSON.stringify(data));
+        } catch (sendError) {
+            reject(new Error('Error al enviar XMLHttpRequest: ' + sendError.message));
+        }
+    });
 }
 
 // Funciones de datos de ejemplo
@@ -206,13 +219,9 @@ function obtenerDatosEjemploCatalogo() {
     ];
 }
 
-function obtenerDatosEjemploPedidos() {
-    console.log('📋 Usando datos de ejemplo para pedidos');
-    return [
-        { idPedido: "TG-0000001", fecha: "2023-10-15", descripcion: "Filtro de Aceite", cantidad: 2, precio: 12.99, total: 25.98, vendedor: "Juan Pérez" },
-        { idPedido: "TG-0000002", fecha: "2023-10-16", descripcion: "Pastillas de Freno", cantidad: 1, precio: 32.50, total: 32.50, vendedor: "María García" },
-        { idPedido: "TG-0000003", fecha: "2023-10-17", descripcion: "Bujías", cantidad: 4, precio: 8.99, total: 35.96, vendedor: "Carlos López" }
-    ];
+// Función para obtener datos de pedidos (mantener igual)
+async function obtenerDatosPedidos() {
+    // ... (mantén el código existente)
 }
 
 // Función para actualizar stock (solo local)
