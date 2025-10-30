@@ -42,6 +42,11 @@ function configurarNavegacion() {
             // Mostrar la sección correspondiente
             const targetId = this.getAttribute('href').substring(1);
             document.getElementById(targetId).classList.add('active');
+            
+            // Si vamos a la sección de nuevo pedido, actualizar el select
+            if (targetId === 'nuevo-pedido') {
+                llenarSelectProductos();
+            }
         });
     });
 }
@@ -62,6 +67,7 @@ async function cargarCatalogo() {
     try {
         // Carga REAL desde Google Sheets
         catalogo = await obtenerDatosCatalogo();
+        console.log('Catálogo cargado:', catalogo);
         mostrarCatalogo(catalogo);
         llenarSelectProductos();
         mostrarExito('Catálogo cargado correctamente desde Google Sheets');
@@ -71,6 +77,7 @@ async function cargarCatalogo() {
         
         // Usar datos de ejemplo como fallback
         catalogo = await obtenerDatosCatalogo();
+        console.log('Catálogo de ejemplo:', catalogo);
         mostrarCatalogo(catalogo);
         llenarSelectProductos();
     }
@@ -80,6 +87,7 @@ async function cargarPedidos() {
     try {
         // Carga REAL desde Google Sheets
         pedidos = await obtenerDatosPedidos();
+        console.log('Pedidos cargados:', pedidos);
         mostrarPedidos(pedidos);
         mostrarExito('Pedidos cargados correctamente desde Google Sheets');
     } catch (error) {
@@ -88,6 +96,7 @@ async function cargarPedidos() {
         
         // Usar datos de ejemplo como fallback
         pedidos = await obtenerDatosPedidos();
+        console.log('Pedidos de ejemplo:', pedidos);
         mostrarPedidos(pedidos);
     }
 }
@@ -95,6 +104,17 @@ async function cargarPedidos() {
 function mostrarCatalogo(productos) {
     const cuerpoTabla = document.getElementById('cuerpo-tabla-catalogo');
     cuerpoTabla.innerHTML = '';
+    
+    if (productos.length === 0) {
+        cuerpoTabla.innerHTML = `
+            <tr>
+                <td colspan="7" style="text-align: center; padding: 20px;">
+                    No hay productos en el catálogo
+                </td>
+            </tr>
+        `;
+        return;
+    }
     
     productos.forEach(producto => {
         const fila = document.createElement('tr');
@@ -123,6 +143,17 @@ function mostrarCatalogo(productos) {
 function mostrarPedidos(listaPedidos) {
     const cuerpoTabla = document.getElementById('cuerpo-tabla-pedidos');
     cuerpoTabla.innerHTML = '';
+    
+    if (listaPedidos.length === 0) {
+        cuerpoTabla.innerHTML = `
+            <tr>
+                <td colspan="8" style="text-align: center; padding: 20px;">
+                    No hay pedidos registrados
+                </td>
+            </tr>
+        `;
+        return;
+    }
     
     listaPedidos.forEach(pedido => {
         const fila = document.createElement('tr');
@@ -168,10 +199,32 @@ function filtrarCatalogo() {
 
 function llenarSelectProductos() {
     const select = document.getElementById('producto-pedido');
+    
+    if (!select) {
+        console.error('No se encontró el elemento producto-pedido');
+        return;
+    }
+    
     select.innerHTML = '<option value="">Seleccione un producto</option>';
     
+    console.log('Llenando select con catálogo:', catalogo);
+    
+    if (!catalogo || catalogo.length === 0) {
+        const option = document.createElement('option');
+        option.value = '';
+        option.textContent = 'No hay productos disponibles';
+        option.disabled = true;
+        select.appendChild(option);
+        console.warn('El catálogo está vacío');
+        return;
+    }
+    
+    let productosConStock = 0;
+    
     catalogo.forEach(producto => {
+        // Solo mostrar productos con stock disponible
         if (producto.stockActual > 0) {
+            productosConStock++;
             const option = document.createElement('option');
             option.value = producto.idinventario;
             option.textContent = `${producto.idinventario} - ${producto.descripcion} (Stock: ${producto.stockActual})`;
@@ -181,6 +234,17 @@ function llenarSelectProductos() {
             select.appendChild(option);
         }
     });
+    
+    if (productosConStock === 0) {
+        const option = document.createElement('option');
+        option.value = '';
+        option.textContent = 'No hay productos con stock disponible';
+        option.disabled = true;
+        select.appendChild(option);
+        console.warn('No hay productos con stock disponible');
+    } else {
+        console.log(`Se agregaron ${productosConStock} productos al select`);
+    }
 }
 
 function actualizarInfoProducto() {
@@ -275,22 +339,32 @@ function mostrarPedidoActual() {
     
     let totalGeneral = 0;
     
-    pedidoActual.forEach((producto, index) => {
-        const fila = document.createElement('tr');
-        fila.innerHTML = `
-            <td>${producto.idinventario}</td>
-            <td>${producto.descripcion}</td>
-            <td>${producto.cantidad}</td>
-            <td>$${producto.precio.toFixed(2)}</td>
-            <td>$${producto.total.toFixed(2)}</td>
-            <td>
-                <button class="btn btn-danger" onclick="eliminarProductoPedido(${index})">Eliminar</button>
-            </td>
+    if (pedidoActual.length === 0) {
+        cuerpoTabla.innerHTML = `
+            <tr>
+                <td colspan="6" style="text-align: center; padding: 20px;">
+                    No hay productos en el pedido
+                </td>
+            </tr>
         `;
-        
-        cuerpoTabla.appendChild(fila);
-        totalGeneral += producto.total;
-    });
+    } else {
+        pedidoActual.forEach((producto, index) => {
+            const fila = document.createElement('tr');
+            fila.innerHTML = `
+                <td>${producto.idinventario}</td>
+                <td>${producto.descripcion}</td>
+                <td>${producto.cantidad}</td>
+                <td>$${producto.precio.toFixed(2)}</td>
+                <td>$${producto.total.toFixed(2)}</td>
+                <td>
+                    <button class="btn btn-danger" onclick="eliminarProductoPedido(${index})">Eliminar</button>
+                </td>
+            `;
+            
+            cuerpoTabla.appendChild(fila);
+            totalGeneral += producto.total;
+        });
+    }
     
     document.getElementById('total-general').textContent = `$${totalGeneral.toFixed(2)}`;
 }
