@@ -16,7 +16,7 @@ function generarPDF(idPedido, vendedor, productos) {
     yPos += 10;
     doc.setFontSize(12);
     doc.setFont(undefined, 'normal');
-    doc.text('Pedido de Venta', pageWidth / 2, yPos, { align: 'center' });
+    doc.text('PEDIDO DE VENTA', pageWidth / 2, yPos, { align: 'center' });
     
     // Información del pedido
     yPos += 15;
@@ -64,7 +64,7 @@ function generarPDF(idPedido, vendedor, productos) {
     doc.text('Para consultas, contactar al departamento de ventas.', 20, finalY + 5);
     
     // Guardar PDF
-    doc.save(`Pedido_${idPedido}.pdf`);
+    doc.save(`Pedido_${idPedido}_${vendedor}.pdf`);
     
     return doc;
 }
