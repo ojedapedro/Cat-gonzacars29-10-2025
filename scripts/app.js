@@ -101,6 +101,85 @@ async function cargarPedidos() {
     }
 }
 
+// FUNCIÓN GUARDAR PEDIDO EN SHEETS - ACTUALIZADA
+async function guardarPedidoEnSheets(idPedido, vendedor, productosPedido) {
+    const url = 'https://script.google.com/macros/s/AKfychv9gqbGihsEQ0hnz_zEDJIecnNqwMZ48-S1T6d_3W1nKk--9KcHjV1p7Kf8Uf0tN0S0/exec';
+    
+    const pedidoData = {
+        idPedido: idPedido,
+        vendedor: vendedor,
+        productos: productosPedido,
+        fecha: new Date().toISOString(),
+        total: productosPedido.reduce((sum, producto) => sum + producto.total, 0)
+    };
+
+    console.log('Enviando datos a Google Sheets:', pedidoData);
+
+    try {
+        console.log('1. Probando fetch normal...');
+        
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(pedidoData)
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            console.log('Éxito con fetch normal:', result);
+            return result;
+        } else {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+    } catch (error) {
+        console.error('Error con fetch normal:', error);
+        
+        // Método alternativo usando XMLHttpRequest
+        console.log('2. Probando método alternativo...');
+        return await metodoAlternativoGuardar(pedidoData, url);
+    }
+}
+
+// MÉTODO ALTERNATIVO PARA GUARDAR
+async function metodoAlternativoGuardar(pedidoData, url) {
+    return new Promise((resolve) => {
+        const xhr = new XMLHttpRequest();
+        
+        xhr.open('POST', url, true);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        
+        xhr.onload = function() {
+            if (xhr.status === 200) {
+                console.log('ÉXITO con método alternativo:', xhr.responseText);
+                try {
+                    const result = JSON.parse(xhr.responseText);
+                    resolve(result);
+                } catch (e) {
+                    resolve({success: true, message: 'Datos enviados (respuesta no JSON)'});
+                }
+            } else {
+                console.error('Error método alternativo:', xhr.statusText);
+                resolve({error: `Error ${xhr.status}: ${xhr.statusText}`});
+            }
+        };
+        
+        xhr.onerror = function() {
+            console.error('Error de red en método alternativo');
+            resolve({error: 'Error de conexión con Google Sheets'});
+        };
+        
+        xhr.onloadend = function() {
+            console.log('Método alternativo completado, estado:', xhr.status);
+        };
+        
+        console.log('USando método alternativo...');
+        xhr.send(JSON.stringify(pedidoData));
+    });
+}
+
 function mostrarCatalogo(productos) {
     const cuerpoTabla = document.getElementById('cuerpo-tabla-catalogo');
     cuerpoTabla.innerHTML = '';
@@ -395,7 +474,11 @@ async function generarPDFPedido() {
         generarPDF(correlativoPedido, vendedor, pedidoActual);
         
         // Guardar pedido en Google Sheets (CONEXIÓN REAL)
-        await guardarPedidoEnSheets(correlativoPedido, vendedor, pedidoActual);
+        const resultado = await guardarPedidoEnSheets(correlativoPedido, vendedor, pedidoActual);
+        
+        if (resultado && resultado.error) {
+            throw new Error(resultado.error);
+        }
         
         // Actualizar stock localmente (opcional)
         await actualizarStockEnSheets(pedidoActual);
